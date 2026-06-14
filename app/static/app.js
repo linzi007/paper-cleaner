@@ -24,6 +24,8 @@ const fileSummary = document.querySelector("#fileSummary");
 const historyCard = document.querySelector("#historyCard");
 const historyList = document.querySelector("#historyList");
 const refreshHistoryBtn = document.querySelector("#refreshHistoryBtn");
+const accountPanel = document.querySelector("#accountPanel");
+const logoutBtn = document.querySelector("#logoutBtn");
 const statusEl = document.querySelector("#status");
 const workspace = document.querySelector("#workspace");
 const cleanPanel = document.querySelector("#cleanPanel");
@@ -82,6 +84,7 @@ loginForm.addEventListener("submit", async (event) => {
 
 homeBtn.addEventListener("click", () => showHome());
 refreshHistoryBtn.addEventListener("click", loadHistory);
+logoutBtn.addEventListener("click", logout);
 fileInput.addEventListener("change", updateFileSummary);
 
 uploadForm.addEventListener("submit", async (event) => {
@@ -172,6 +175,7 @@ function showHome() {
   homeBtn.classList.add("hidden");
   uploadCard.classList.remove("hidden");
   historyCard.classList.remove("hidden");
+  accountPanel.classList.remove("hidden");
   workspace.classList.add("hidden");
   statusEl.textContent = "等待上传";
   loadHistory();
@@ -181,6 +185,7 @@ function showLogin(message) {
   loginPanel.classList.remove("hidden");
   uploadCard.classList.add("hidden");
   historyCard.classList.add("hidden");
+  accountPanel.classList.add("hidden");
   workspace.classList.add("hidden");
   userBar.classList.add("hidden");
   statusEl.textContent = message || "请登录";
@@ -196,6 +201,19 @@ function resetWorkspace() {
   fileInput.value = "";
   updateFileSummary();
   clearPreview();
+}
+
+async function logout() {
+  logoutBtn.disabled = true;
+  setBusy(true, "退出中");
+  try {
+    await fetch("/api/auth/logout", { method: "POST" });
+  } finally {
+    logoutBtn.disabled = false;
+    setBusy(false);
+    resetWorkspace();
+    showLogin("请登录");
+  }
 }
 
 function updateFileSummary() {
@@ -225,7 +243,7 @@ function setLoginBusy(busy) {
   loginForm.querySelector("button").disabled = busy;
   phoneInput.disabled = busy;
   passwordInput.disabled = busy;
-  setProcessing(busy, "登录中");
+  setProcessing(busy, busy ? "登录中" : undefined);
 }
 
 async function loadHistory() {
@@ -289,6 +307,7 @@ function loadJob(job, options = {}) {
   currentAdjustPage = printRegions[0]?.page || currentSelectPage;
   uploadCard.classList.add("hidden");
   historyCard.classList.add("hidden");
+  accountPanel.classList.add("hidden");
   workspace.classList.remove("hidden");
   homeBtn.classList.remove("hidden");
   cleanCount.textContent = `${job.pages.length} 页`;

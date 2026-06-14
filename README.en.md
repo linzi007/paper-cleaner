@@ -33,6 +33,20 @@ https://github.com/linzi007/paper-cleaner
 - Cleans up old jobs and logs on a schedule.
 - Deploys with Docker Compose on `127.0.0.1:8091`, suitable for an Nginx reverse proxy.
 
+## Screenshots
+
+<p>
+  <img src="./docs/images/home.png" width="220" alt="Home" />
+  <img src="./docs/images/cleaner.png" width="220" alt="Cleaned paper" />
+  <img src="./docs/images/pick.png" width="220" alt="Pick questions" />
+</p>
+
+<p>
+  <img src="./docs/images/resize.png" width="220" alt="Adjust regions" />
+  <img src="./docs/images/preview.png" width="220" alt="Preview PDF" />
+  <img src="./docs/images/download.png" width="220" alt="Download PDF" />
+</p>
+
 ## What Is Not Committed
 
 Runtime secrets, user data, and uploaded files are excluded by `.gitignore` and should not be committed:

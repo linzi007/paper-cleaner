@@ -13,6 +13,11 @@
         <path d="M10 17l5-5-5-5" />
         <path d="M15 12H3" />
       </symbol>
+      <symbol id="i-log-out" viewBox="0 0 24 24">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <path d="M16 17l5-5-5-5" />
+        <path d="M21 12H9" />
+      </symbol>
       <symbol id="i-home" viewBox="0 0 24 24">
         <path d="M3 11.5 12 4l9 7.5" />
         <path d="M5 10.5V20h14v-9.5" />
@@ -133,6 +138,10 @@
         </div>
         <div id="historyList" class="history-list"></div>
         <div class="tip-bar">历史只保留短期记录，点击记录可以继续预览或重新选择题目。</div>
+      </section>
+
+      <section id="accountPanel" class="account-panel hidden">
+        <button id="logoutBtn" type="button"><svg class="icon"><use href="#i-log-out"></use></svg><span>退出登录</span></button>
       </section>
 
       <section id="workspace" class="workspace hidden">

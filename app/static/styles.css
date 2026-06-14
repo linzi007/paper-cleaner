@@ -74,6 +74,11 @@ button {
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
 }
 
+button span,
+.download-btn span {
+  white-space: nowrap;
+}
+
 button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
@@ -178,6 +183,23 @@ p {
   border-color: #c8d7e6;
   background: #f7fbff;
   color: #17334d;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.account-panel {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 2px;
+}
+
+#logoutBtn {
+  min-height: 38px;
+  padding: 0 14px;
+  border-color: transparent;
+  background: transparent;
+  color: #5f6f83;
   font-size: 12px;
   font-weight: 600;
   box-shadow: none;
@@ -437,20 +459,21 @@ p {
 }
 
 .steps button {
-  flex-direction: column;
-  gap: 3px;
+  flex-direction: row;
+  gap: 4px;
   min-height: 40px;
-  padding: 0 6px;
+  padding: 0 5px;
   border-color: #d4dde8;
   background: #fff;
   color: #111827;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .steps .icon {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
 }
 
 .steps span {
@@ -485,12 +508,21 @@ p {
 }
 
 .action-bar {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.action-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .action-bar button,
 .download-btn {
-  flex: 1 1 30%;
+  flex: 1 0 auto;
+  min-width: max-content;
+  white-space: nowrap;
 }
 
 .action-bar button:not(:last-child),

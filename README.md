@@ -33,6 +33,20 @@ https://github.com/linzi007/paper-cleaner
 - 定时清理旧任务和日志。
 - Docker Compose 部署，默认只监听 `127.0.0.1:8091`，适合用 Nginx 反向代理到公网。
 
+## 界面预览
+
+<p>
+  <img src="./docs/images/home.png" width="220" alt="首页" />
+  <img src="./docs/images/cleaner.png" width="220" alt="清痕结果" />
+  <img src="./docs/images/pick.png" width="220" alt="选择题目" />
+</p>
+
+<p>
+  <img src="./docs/images/resize.png" width="220" alt="调整范围" />
+  <img src="./docs/images/preview.png" width="220" alt="打印预览" />
+  <img src="./docs/images/download.png" width="220" alt="下载打印" />
+</p>
+
 ## 不会提交到仓库的内容
 
 以下内容属于运行时密钥、用户数据或上传文件，已经通过 `.gitignore` 排除，不应该提交到 GitHub：
