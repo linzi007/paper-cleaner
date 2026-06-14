@@ -2,6 +2,7 @@
 .env.*
 !.env.example
 data/
+docs/images/
 __pycache__/
 *.pyc
 *.pyo
