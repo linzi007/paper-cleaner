@@ -1,0 +1,19 @@
+services:
+  paper-cleaner:
+    build: .
+    container_name: paper-cleaner
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8091:8091"
+    volumes:
+      - ./data:/data
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Shanghai
+      - PAPER_CLEANER_DATA_DIR=/data
+      - PAPER_CLEANER_TENCENT_USE_NEW_MODEL=${PAPER_CLEANER_TENCENT_USE_NEW_MODEL:-true}
+      - PAPER_CLEANER_MAX_PAGES=${PAPER_CLEANER_MAX_PAGES:-20}
+      - PAPER_CLEANER_JOB_RETENTION_DAYS=${PAPER_CLEANER_JOB_RETENTION_DAYS:-7}
+      - PAPER_CLEANER_LOG_RETENTION_DAYS=${PAPER_CLEANER_LOG_RETENTION_DAYS:-7}
+      - PAPER_CLEANER_CLEANUP_INTERVAL_MINUTES=${PAPER_CLEANER_CLEANUP_INTERVAL_MINUTES:-360}

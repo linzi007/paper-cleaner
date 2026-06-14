@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>试卷清痕打印</title>
+    <link rel="stylesheet" href="/static/styles.css?v=20260614-shadow-history-v1" />
+  </head>
+  <body>
+    <svg class="svg-sprite" aria-hidden="true">
+      <symbol id="i-log-in" viewBox="0 0 24 24">
+        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+        <path d="M10 17l5-5-5-5" />
+        <path d="M15 12H3" />
+      </symbol>
+      <symbol id="i-home" viewBox="0 0 24 24">
+        <path d="M3 11.5 12 4l9 7.5" />
+        <path d="M5 10.5V20h14v-9.5" />
+        <path d="M9.5 20v-6h5v6" />
+      </symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24">
+        <path d="M12 16V4" />
+        <path d="M7 9l5-5 5 5" />
+        <path d="M4 16.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2.5" />
+      </symbol>
+      <symbol id="i-spark" viewBox="0 0 24 24">
+        <path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8L12 2Z" />
+        <path d="M19 15l.8 2.8L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-1.2L19 15Z" />
+      </symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24">
+        <path d="M20 6v5h-5" />
+        <path d="M4 18v-5h5" />
+        <path d="M18 9a7 7 0 0 0-11.8-2.5L4 9" />
+        <path d="M6 15a7 7 0 0 0 11.8 2.5L20 15" />
+      </symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8" />
+        <path d="M12 8v5l3 2" />
+      </symbol>
+      <symbol id="i-file" viewBox="0 0 24 24">
+        <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z" />
+        <path d="M14 3v6h6" />
+        <path d="M8 13h8" />
+        <path d="M8 17h5" />
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24">
+        <path d="M20 6 9 17l-5-5" />
+      </symbol>
+      <symbol id="i-list" viewBox="0 0 24 24">
+        <path d="M8 6h13" />
+        <path d="M8 12h13" />
+        <path d="M8 18h13" />
+        <path d="M3 6h.01" />
+        <path d="M3 12h.01" />
+        <path d="M3 18h.01" />
+      </symbol>
+      <symbol id="i-crop" viewBox="0 0 24 24">
+        <path d="M6 3v15h15" />
+        <path d="M3 6h15v15" />
+      </symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24">
+        <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+        <circle cx="12" cy="12" r="2.5" />
+      </symbol>
+      <symbol id="i-download" viewBox="0 0 24 24">
+        <path d="M12 3v12" />
+        <path d="M7 10l5 5 5-5" />
+        <path d="M5 21h14" />
+      </symbol>
+      <symbol id="i-printer" viewBox="0 0 24 24">
+        <path d="M7 8V3h10v5" />
+        <path d="M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
+        <path d="M7 14h10v7H7z" />
+      </symbol>
+      <symbol id="i-arrow-right" viewBox="0 0 24 24">
+        <path d="M5 12h14" />
+        <path d="m13 6 6 6-6 6" />
+      </symbol>
+      <symbol id="i-arrow-left" viewBox="0 0 24 24">
+        <path d="M19 12H5" />
+        <path d="m11 6-6 6 6 6" />
+      </symbol>
+      <symbol id="i-merge" viewBox="0 0 24 24">
+        <path d="M4 7h6a4 4 0 0 1 4 4v6" />
+        <path d="M4 17h6a4 4 0 0 0 4-4V7" />
+        <path d="M18 7h2" />
+        <path d="M18 17h2" />
+      </symbol>
+      <symbol id="i-rotate" viewBox="0 0 24 24">
+        <path d="M4 12a8 8 0 0 1 13.7-5.7L20 8" />
+        <path d="M20 4v4h-4" />
+        <path d="M20 12a8 8 0 0 1-13.7 5.7L4 16" />
+        <path d="M4 20v-4h4" />
+      </symbol>
+    </svg>
+    <main class="app">
+      <header class="topbar">
+        <h1>试卷清痕打印</h1>
+        <div class="status-block">
+          <p id="status">请登录</p>
+          <div id="userBar" class="user-bar hidden">
+            <span id="currentUser"></span>
+            <button id="homeBtn" type="button"><svg class="icon"><use href="#i-home"></use></svg><span>首页</span></button>
+          </div>
+        </div>
+      </header>
+
+      <section id="loginPanel" class="panel">
+        <form id="loginForm" class="login-form">
+          <input id="phoneInput" type="tel" inputmode="numeric" autocomplete="tel" placeholder="手机号" required />
+          <input id="passwordInput" type="password" autocomplete="current-password" placeholder="密码" required />
+          <button type="submit"><svg class="icon"><use href="#i-log-in"></use></svg><span>登录</span></button>
+        </form>
+        <div class="tip-bar">选择图片或 PDF 后点击清除痕迹，处理时请保持页面打开。</div>
+      </section>
+
+      <section id="uploadCard" class="panel upload-panel hidden">
+        <form id="uploadForm" class="upload">
+          <label class="upload-picker" for="fileInput">
+            <span class="upload-mark"><svg class="upload-icon"><use href="#i-upload"></use></svg></span>
+            <span class="upload-title">选择试卷文件</span>
+            <span id="fileSummary" class="upload-summary">图片或 PDF</span>
+          </label>
+          <input id="fileInput" class="file-input" type="file" name="files" accept=".pdf,.png,.jpg,.jpeg,.bmp,.webp" multiple required />
+          <button type="submit"><svg class="icon"><use href="#i-spark"></use></svg><span>清除痕迹</span></button>
+        </form>
+      </section>
+
+      <section id="historyCard" class="panel history-card hidden">
+        <div class="panel-head">
+          <strong><svg class="section-icon"><use href="#i-clock"></use></svg><span>历史记录</span></strong>
+          <button id="refreshHistoryBtn" type="button"><svg class="icon"><use href="#i-refresh"></use></svg><span>刷新</span></button>
+        </div>
+        <div id="historyList" class="history-list"></div>
+        <div class="tip-bar">历史只保留短期记录，点击记录可以继续预览或重新选择题目。</div>
+      </section>
+
+      <section id="workspace" class="workspace hidden">
+        <nav class="steps">
+          <button type="button" data-step="clean" class="active"><svg class="icon"><use href="#i-spark"></use></svg><span>清痕</span></button>
+          <button type="button" data-step="select" disabled><svg class="icon"><use href="#i-check"></use></svg><span>选题</span></button>
+          <button type="button" data-step="adjust" disabled><svg class="icon"><use href="#i-crop"></use></svg><span>调整</span></button>
+          <button type="button" data-step="preview" disabled><svg class="icon"><use href="#i-eye"></use></svg><span>预览</span></button>
+          <button type="button" data-step="download" disabled><svg class="icon"><use href="#i-download"></use></svg><span>下载</span></button>
+        </nav>
+
+        <section id="cleanPanel" class="panel step-panel">
+          <div class="panel-head">
+            <strong><svg class="section-icon"><use href="#i-file"></use></svg><span>清痕结果</span></strong>
+            <span id="cleanCount">0 页</span>
+          </div>
+          <div class="action-bar">
+            <button id="fullExportBtn" type="button"><svg class="icon"><use href="#i-eye"></use></svg><span>整卷预览</span></button>
+            <button id="chooseQuestionsBtn" type="button"><svg class="icon"><use href="#i-check"></use></svg><span>选择题目</span></button>
+          </div>
+          <div id="cleanPages" class="page-stack"></div>
+          <div class="tip-bar">整卷打印可直接预览；只打印错题或部分题目时，点击选择题目。</div>
+        </section>
+
+        <section id="selectPanel" class="panel step-panel hidden">
+          <div class="panel-head">
+            <strong><svg class="section-icon"><use href="#i-check"></use></svg><span>选择题目</span></strong>
+            <span id="selectCount">0/0</span>
+          </div>
+          <div class="action-bar">
+            <button id="selectAll" type="button"><svg class="icon"><use href="#i-check"></use></svg><span>本页全选</span></button>
+            <button id="clearAll" type="button"><svg class="icon"><use href="#i-rotate"></use></svg><span>本页清空</span></button>
+            <button id="nextAdjustBtn" type="button"><svg class="icon"><use href="#i-arrow-right"></use></svg><span>下一步</span></button>
+          </div>
+          <div class="select-tools">
+            <div id="selectPageTabs" class="page-tabs"></div>
+            <div class="selection-note">点击题号或图片上的题目框选择要打印的题目</div>
+            <div id="questionChips" class="chips"></div>
+          </div>
+          <div id="selectPages" class="page-stack"></div>
+          <div class="tip-bar">绿色表示已选中；本页选完后点下一步，系统会自动合并连续题目范围。</div>
+        </section>
+
+        <section id="adjustPanel" class="panel step-panel hidden">
+          <div class="panel-head">
+            <strong><svg class="section-icon"><use href="#i-crop"></use></svg><span>调整范围</span></strong>
+            <span id="activeLabel">未选择</span>
+          </div>
+          <div class="action-bar">
+            <button id="mergeBtn" type="button"><svg class="icon"><use href="#i-merge"></use></svg><span>合并本页</span></button>
+            <button id="resetBtn" type="button"><svg class="icon"><use href="#i-rotate"></use></svg><span>重置</span></button>
+            <button id="regionExportBtn" type="button"><svg class="icon"><use href="#i-eye"></use></svg><span>生成预览</span></button>
+          </div>
+          <div id="adjustPageTabs" class="page-tabs"></div>
+          <div id="adjustPages" class="page-stack"></div>
+          <div class="tip-bar">拖动框体可移动范围，拖动边角圆点可调整大小；确认后生成预览。</div>
+        </section>
+
+        <section id="previewPanel" class="panel step-panel hidden">
+          <div class="panel-head">
+            <strong><svg class="section-icon"><use href="#i-eye"></use></svg><span>打印预览</span></strong>
+            <span>PDF</span>
+          </div>
+          <div class="action-bar">
+            <button id="backAdjustBtn" type="button"><svg class="icon"><use href="#i-arrow-left"></use></svg><span>返回调整</span></button>
+            <button id="goDownloadBtn" type="button"><svg class="icon"><use href="#i-arrow-right"></use></svg><span>下一步</span></button>
+          </div>
+          <iframe id="pdfPreview" class="pdf-preview" title="PDF 预览"></iframe>
+          <div class="tip-bar">先检查页面顺序和裁剪范围，没问题再进入下载打印。</div>
+        </section>
+
+        <section id="downloadPanel" class="panel step-panel hidden">
+          <div class="panel-head">
+            <strong><svg class="section-icon"><use href="#i-download"></use></svg><span>下载打印</span></strong>
+            <span>PDF</span>
+          </div>
+          <div class="action-bar">
+            <button id="backPreviewBtn" type="button"><svg class="icon"><use href="#i-arrow-left"></use></svg><span>返回预览</span></button>
+            <a id="openPdfLink" class="download-btn secondary" href="#" target="_blank" rel="noopener"><svg class="icon"><use href="#i-printer"></use></svg><span>打开打印</span></a>
+            <a id="downloadLink" class="download-btn" href="#" download="paper-cleaner.pdf"><svg class="icon"><use href="#i-download"></use></svg><span>下载 PDF</span></a>
+          </div>
+          <div class="tip-bar">手机上建议先打开打印检查系统预览，再发送到打印机。</div>
+        </section>
+      </section>
+    </main>
+    <div id="busyOverlay" class="busy-overlay hidden" role="status" aria-live="polite">
+      <div class="busy-card">
+        <span class="busy-spinner"></span>
+        <span id="busyText">处理中</span>
+      </div>
+    </div>
+    <script src="/static/app.js?v=20260614-shadow-history-v1"></script>
+  </body>
+</html>
