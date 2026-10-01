@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import io
 import json
+from dataclasses import dataclass
 from pathlib import Path
 import time
 from typing import Any
@@ -16,6 +17,13 @@ from ..config import Settings
 
 OCR_HOST = "ocr.tencentcloudapi.com"
 OCR_VERSION = "2018-11-19"
+
+
+@dataclass
+class QuestionDetection:
+    questions: list[Any]
+    width: int
+    height: int
 
 
 class TencentQuestionSplitter:
@@ -36,7 +44,7 @@ class TencentQuestionSplitter:
         self.client = ocr_client.OcrClient(cred, cfg.tencent_region, client_profile)
         self.use_new_model = cfg.tencent_use_new_model
 
-    def detect(self, image_path: Path, page: int):
+    def detect(self, image_path: Path, page: int, output_path: Path) -> QuestionDetection:
         from tencentcloud.ocr.v20181119 import models
 
         from ..pipeline import Question, image_base64_under_limit, parse_question_label
@@ -49,7 +57,34 @@ class TencentQuestionSplitter:
 
         resp = self.client.QuestionSplitOCR(req)
         data = json.loads(resp.to_json_string())
-        return self._parse_response(data, page, Question, parse_question_label)
+        return self._save_detection(data, output_path, page, Question, parse_question_label)
+
+    def _save_detection(self, data, output_path, page, question_cls, label_parser) -> QuestionDetection:
+        # The service may dewarp the page without changing its dimensions.
+        # Its boxes belong to the returned image, not to the submitted image.
+        infos = data.get("QuestionInfo") or []
+        if len(infos) != 1:
+            raise RuntimeError("单页题目识别未返回唯一的页面结果")
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        diagnostic = {
+            "RequestId": data.get("RequestId"),
+            "EnableImageCrop": True,
+            "QuestionInfo": [{key: value for key, value in info.items() if key != "ImageBase64"} for info in infos],
+        }
+        output_path.with_suffix(".json").write_text(json.dumps(diagnostic, ensure_ascii=False, indent=2), encoding="utf-8")
+        info = infos[0]
+        encoded = info.get("ImageBase64")
+        if not encoded:
+            raise RuntimeError("题目识别未返回校正图，无法安全定位题框，请重试")
+        with Image.open(io.BytesIO(_decode_image_value(encoded))) as image:
+            width, height = image.size
+            if (info.get("Width") and int(info["Width"]) != width) or (info.get("Height") and int(info["Height"]) != height):
+                raise RuntimeError("题目识别返回的图片与坐标尺寸不一致，请重试")
+            questions = self._parse_response(data, page, question_cls, label_parser)
+            if not questions:
+                raise RuntimeError(f"第 {page} 页未识别到题目区域")
+            image.convert("RGB").save(output_path, format="PNG")
+        return QuestionDetection(questions=questions, width=width, height=height)
 
     def _parse_response(self, data: dict[str, Any], page: int, question_cls, label_parser):
         questions = []

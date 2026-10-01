@@ -1,4 +1,5 @@
 let currentJob = null;
+let showOriginalPages = false;
 let questions = [];
 let originalQuestions = [];
 let currentSelectPage = 1;
@@ -44,6 +45,7 @@ const selectCount = document.querySelector("#selectCount");
 const activeLabelEl = document.querySelector("#activeLabel");
 const fullExportBtn = document.querySelector("#fullExportBtn");
 const chooseQuestionsBtn = document.querySelector("#chooseQuestionsBtn");
+const compareOriginalBtn = document.querySelector("#compareOriginalBtn");
 const selectAllBtn = document.querySelector("#selectAll");
 const clearAllBtn = document.querySelector("#clearAll");
 const nextAdjustBtn = document.querySelector("#nextAdjustBtn");
@@ -58,6 +60,11 @@ const backAdjustBtn = document.querySelector("#backAdjustBtn");
 const backPreviewBtn = document.querySelector("#backPreviewBtn");
 const busyOverlay = document.querySelector("#busyOverlay");
 const busyText = document.querySelector("#busyText");
+
+compareOriginalBtn.addEventListener("click", () => {
+  showOriginalPages = !showOriginalPages;
+  renderCleanStep();
+});
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -298,6 +305,7 @@ async function openHistoryJob(jobId) {
 
 function loadJob(job, options = {}) {
   currentJob = job;
+  showOriginalPages = false;
   loadQuestions(job.questions || []);
   selected.clear();
   printRegions = restorePrintRegions(job);
@@ -410,8 +418,11 @@ function updateStepState() {
 
 function renderCleanStep() {
   cleanPages.innerHTML = "";
+  compareOriginalBtn.textContent = showOriginalPages ? "返回清痕结果" : "对照处理前";
+  compareOriginalBtn.setAttribute("aria-pressed", String(showOriginalPages));
+  cleanCount.textContent = `${showOriginalPages ? "处理前 · " : ""}${currentJob.pages.length} 页`;
   for (const page of currentJob.pages) {
-    cleanPages.appendChild(createPageCard(page, page.cleaned_image_url, [], "clean"));
+    cleanPages.appendChild(createPageCard(page, showOriginalPages ? page.image_url : page.cleaned_image_url, [], "clean"));
   }
 }
 
@@ -427,7 +438,7 @@ function renderSelectStep() {
   selectPages.innerHTML = "";
   const page = getPage(currentSelectPage);
   if (page) {
-    selectPages.appendChild(createPageCard(page, page.image_url, pageQuestions(page.page), "select"));
+    selectPages.appendChild(createPageCard(page, page.question_image_url || page.cleaned_image_url, pageQuestions(page.page), "select"));
   }
   renderQuestionChips();
   updateStepState();
@@ -445,7 +456,7 @@ function renderAdjustStep() {
   adjustPages.innerHTML = "";
   const page = getPage(currentAdjustPage);
   if (page) {
-    adjustPages.appendChild(createPageCard(page, page.cleaned_image_url, printRegions.filter((region) => region.page === page.page), "adjust"));
+    adjustPages.appendChild(createPageCard(page, page.question_image_url || page.cleaned_image_url, printRegions.filter((region) => region.page === page.page), "adjust"));
   }
   updateStepState();
 }
@@ -558,7 +569,8 @@ function syncSelectionClasses() {
 
 function buildPrintRegions() {
   const regions = [];
-  for (const page of currentJob.pages) {
+  for (const item of currentJob.pages) {
+    const page = questionPageGeometry(item);
     const all = pageQuestions(page.page);
     const selectedOnPage = all.filter((question) => selected.has(question.id));
     if (!selectedOnPage.length) continue;
@@ -739,7 +751,16 @@ function pageQuestions(page) {
 }
 
 function getPage(page) {
-  return currentJob.pages.find((item) => item.page === page);
+  const item = currentJob.pages.find((item) => item.page === page);
+  return item && questionPageGeometry(item);
+}
+
+function questionPageGeometry(page) {
+  return {
+    ...page,
+    width: page.question_width || page.width,
+    height: page.question_height || page.height,
+  };
 }
 
 function normalizeQuestion(question, index) {

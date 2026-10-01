@@ -17,6 +17,8 @@ class Settings:
     tencent_secret_key: str | None = os.getenv("TENCENTCLOUD_SECRET_KEY")
     tencent_region: str = os.getenv("TENCENTCLOUD_REGION", "ap-guangzhou")
     tencent_use_new_model: bool = _bool_env("PAPER_CLEANER_TENCENT_USE_NEW_MODEL", True)
+    auto_crop_images: bool = _bool_env("PAPER_CLEANER_AUTO_CROP_IMAGES", True)
+    enhance_print_background: bool = _bool_env("PAPER_CLEANER_ENHANCE_PRINT_BACKGROUND", False)
     render_dpi: int = int(os.getenv("PAPER_CLEANER_RENDER_DPI", "180"))
     max_pages: int = int(os.getenv("PAPER_CLEANER_MAX_PAGES", "20"))
     job_retention_days: int = int(os.getenv("PAPER_CLEANER_JOB_RETENTION_DAYS", "7"))

@@ -25,6 +25,8 @@ https://github.com/linzi007/paper-cleaner
 - 使用腾讯云 `QuestionSplitOCR` 识别题目区域。
 - 支持 PDF 和常见图片格式上传。
 - 支持一次上传多张图片，多张图片会作为同一个任务的多页处理。
+- 图片上传时优先提取清晰的纸张边界并校正透视；无法可靠识别时退回轻量裁边和小角度转正。
+- 清痕页支持对照处理前图片；PDF 默认保留清痕图细节和原始像素，不再强制提白或压成 150 DPI 位图。
 - 支持整卷预览、打印、下载。
 - 支持选择部分题目，生成错题或专项重练 PDF。
 - 支持手动调整 OCR 识别出的题目框。
@@ -92,6 +94,7 @@ TENCENTCLOUD_SECRET_ID=your-secret-id
 TENCENTCLOUD_SECRET_KEY=your-secret-key
 TENCENTCLOUD_REGION=ap-guangzhou
 PAPER_CLEANER_TENCENT_USE_NEW_MODEL=true
+PAPER_CLEANER_AUTO_CROP_IMAGES=true
 PAPER_CLEANER_MAX_PAGES=20
 PAPER_CLEANER_DEFAULT_ADMIN_PHONE=13800000000
 ```
@@ -99,6 +102,8 @@ PAPER_CLEANER_DEFAULT_ADMIN_PHONE=13800000000
 说明：
 
 - `TENCENTCLOUD_SECRET_ID` 和 `TENCENTCLOUD_SECRET_KEY` 不要提交到 git。
+- `PAPER_CLEANER_AUTO_CROP_IMAGES` 默认开启；如果某些照片被误裁，可以设为 `false` 关闭图片自动裁边和转正。
+- `PAPER_CLEANER_ENHANCE_PRINT_BACKGROUND` 默认关闭，避免额外提白损伤细线；设为 `true` 可使用原有的打印背景增强。
 - `PAPER_CLEANER_DEFAULT_ADMIN_PHONE` 只在首次启动且 `data/users.json` 不存在时生效。
 - `PAPER_CLEANER_MAX_PAGES` 用于限制单个任务最多处理页数。
 

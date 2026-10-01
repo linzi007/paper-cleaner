@@ -162,6 +162,14 @@ def export(job_id: str, request: ExportRequest, user: dict = Depends(require_use
     }
 
 
+@app.get("/api/jobs/{job_id}/question-pages/{page}")
+def question_page_image(job_id: str, page: int, user: dict = Depends(require_user)):
+    image_path = job_dir_for(user["phone"], job_id) / "question_pages" / f"page-{page:03d}.png"
+    if not image_path.exists():
+        raise HTTPException(status_code=404, detail="question page not found")
+    return FileResponse(image_path, media_type="image/png")
+
+
 @app.get("/api/jobs/{job_id}/preview.pdf")
 def preview_file(job_id: str, request: Request, access_token: str | None = None):
     phone = resolve_job_file_phone(request, job_id, access_token)
@@ -207,4 +215,6 @@ def hydrate_metadata_urls(metadata: dict) -> dict:
     for page in metadata["pages"]:
         page["image_url"] = page["image_url"].replace("{job_id}", job_id)
         page["cleaned_image_url"] = page["cleaned_image_url"].replace("{job_id}", job_id)
+        if page.get("question_image_url"):
+            page["question_image_url"] = page["question_image_url"].replace("{job_id}", job_id)
     return metadata

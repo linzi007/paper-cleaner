@@ -1,8 +1,10 @@
 import base64
 import io
 import json
+import math
 import re
 import shutil
+import statistics
 import time
 import uuid
 from dataclasses import asdict, dataclass
@@ -13,6 +15,7 @@ import fitz
 from PIL import Image, ImageFilter, ImageMath, ImageOps
 
 from .config import Settings, settings
+from .page_geometry import rectify_page_photo
 from .providers.tencent_ocr import TencentHandwritingEraser, TencentQuestionSplitter
 
 
@@ -26,6 +29,9 @@ class PageInfo:
     cleaned_image_url: str
     width: int
     height: int
+    question_image_url: str | None = None
+    question_width: int | None = None
+    question_height: int | None = None
 
 
 @dataclass
@@ -180,8 +186,10 @@ def render_pages(upload_path: Path, pages_dir: Path, cfg: Settings, start_page: 
         raise ValueError("只支持 PDF、PNG、JPG、JPEG、BMP、WEBP")
 
     with Image.open(upload_path) as image:
-        image = image.convert("RGB")
+        image = ImageOps.exif_transpose(image).convert("RGB")
         image.thumbnail((2600, 3600), Image.Resampling.LANCZOS)
+        if cfg.auto_crop_images:
+            image = normalize_uploaded_page_photo(image)
         image_path = pages_dir / f"page-{start_page:03d}.png"
         image.save(image_path)
         width, height = image.size
@@ -200,16 +208,26 @@ def render_pages(upload_path: Path, pages_dir: Path, cfg: Settings, start_page: 
 def detect_questions(job_dir: Path, pages: list[PageInfo], cfg: Settings) -> list[Question]:
     questions: list[Question] = []
     splitter = TencentQuestionSplitter(cfg)
+    # Do not replace images referenced by an existing result until every page
+    # succeeds. Failed attempts retain their diagnostics inside the job.
+    attempt_dir = job_dir / "question_attempts" / uuid.uuid4().hex
 
     for page in pages:
         cleaned_path = job_dir / "cleaned_pages" / f"page-{page.page:03d}.png"
         if not cleaned_path.exists():
             raise RuntimeError(f"第 {page.page} 页清痕图不存在，无法识别题目")
-        detected = splitter.detect(image_path=cleaned_path, page=page.page)
-        if not detected:
-            raise RuntimeError(f"第 {page.page} 页未识别到题目区域")
-        questions.extend(detected)
+        question_path = attempt_dir / f"page-{page.page:03d}.png"
+        detected = splitter.detect(image_path=cleaned_path, page=page.page, output_path=question_path)
+        page.question_image_url = f"/api/jobs/{{job_id}}/question-pages/{page.page}"
+        page.question_width = detected.width
+        page.question_height = detected.height
+        questions.extend(detected.questions)
 
+    question_dir = job_dir / "question_pages"
+    question_dir.mkdir(parents=True, exist_ok=True)
+    for path in attempt_dir.iterdir():
+        path.replace(question_dir / path.name)
+    attempt_dir.rmdir()
     return questions
 
 
@@ -219,6 +237,7 @@ def detect_job_questions(job_id: str, owner_phone: str, cfg: Settings = settings
     metadata = read_json(meta_path)
     pages = [PageInfo(**page) for page in metadata["pages"]]
     questions = detect_questions(job_dir, pages, cfg)
+    metadata["pages"] = [asdict(page) for page in pages]
     metadata["questions"] = [asdict(question) for question in questions]
     metadata["questions_detected"] = True
     metadata["updated_at"] = int(time.time())
@@ -241,20 +260,24 @@ def export_pdf(
         question_map = {item["id"]: item for item in meta["questions"]}
         selected = [question_map[qid] for qid in question_ids if qid in question_map]
     if not selected:
-        return export_cleaned_pages(job_dir, meta)
+        return export_cleaned_pages(job_dir, meta, cfg)
 
     crops: list[Image.Image] = []
+    pages_by_number = {int(page["page"]): page for page in meta["pages"]}
     for question in selected:
         page = int(question["page"])
-        cleaned_page_path = job_dir / "cleaned_pages" / f"page-{page:03d}.png"
-        if not cleaned_page_path.exists():
-            raise RuntimeError(f"第 {page} 页清痕图不存在，无法导出")
-        page_path = cleaned_page_path
+        page_info = pages_by_number.get(page)
+        if page_info is None:
+            raise ValueError(f"第 {page} 页不存在")
+        image_dir = "question_pages" if page_info.get("question_image_url") else "cleaned_pages"
+        page_path = job_dir / image_dir / f"page-{page:03d}.png"
+        if not page_path.exists():
+            raise RuntimeError(f"第 {page} 页选题图片不存在，请重新识别后导出")
         with Image.open(page_path) as page_image:
             page_image = page_image.convert("RGB")
             bbox = expand_bbox(question["bbox"], page_image.width, page_image.height, padding=14)
             crop = page_image.crop(tuple(bbox))
-            crops.append(normalize_print_background(crop))
+            crops.append(normalize_print_background(crop, enhance=cfg.enhance_print_background))
 
     output_path = job_dir / "output.pdf"
     build_a4_pdf(crops, output_path)
@@ -268,7 +291,7 @@ def export_pdf(
     return output_path
 
 
-def export_cleaned_pages(job_dir: Path, meta: dict[str, Any]) -> Path:
+def export_cleaned_pages(job_dir: Path, meta: dict[str, Any], cfg: Settings = settings) -> Path:
     pages: list[Image.Image] = []
     for page in meta["pages"]:
         page_no = int(page["page"])
@@ -276,7 +299,7 @@ def export_cleaned_pages(job_dir: Path, meta: dict[str, Any]) -> Path:
         if not cleaned_page_path.exists():
             raise RuntimeError(f"第 {page_no} 页清痕图不存在，无法导出")
         with Image.open(cleaned_page_path) as page_image:
-            pages.append(normalize_print_background(page_image))
+            pages.append(normalize_print_background(page_image, enhance=cfg.enhance_print_background))
 
     output_path = job_dir / "output.pdf"
     build_a4_pdf(pages, output_path)
@@ -326,36 +349,32 @@ def prepare_clean_pages(job_dir: Path, pages: list[PageInfo], cfg: Settings) -> 
 
 
 def build_a4_pdf(images: list[Image.Image], output_path: Path) -> None:
-    a4_width, a4_height = 1240, 1754
-    margin = 70
-    gap = 36
-    pages: list[Image.Image] = []
-    sheet = Image.new("RGB", (a4_width, a4_height), "white")
-    cursor_y = margin
-
-    for image in images:
-        image = image.convert("RGB")
-        max_width = a4_width - margin * 2
-        max_height = a4_height - margin * 2
-        scale = min(max_width / image.width, max_height / image.height, 1.0)
-        target = image.resize((max(1, int(image.width * scale)), max(1, int(image.height * scale))), Image.Resampling.LANCZOS)
-
-        if cursor_y + target.height > a4_height - margin and cursor_y > margin:
-            pages.append(sheet)
-            sheet = Image.new("RGB", (a4_width, a4_height), "white")
-            cursor_y = margin
-
-        x = margin
-        sheet.paste(target, (x, cursor_y))
-        cursor_y += target.height + gap
-
-    pages.append(sheet)
+    # Keep source pixels instead of resampling to a 150-DPI sheet and then
+    # JPEG-encoding it. Placement stays in physical A4 coordinates.
+    a4_width, a4_height = fitz.paper_size("a4")
+    margin, gap = 70 * 72 / 150, 36 * 72 / 150
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    pages[0].save(output_path, "PDF", save_all=True, append_images=pages[1:], resolution=150.0)
+    with fitz.open() as document:
+        page = document.new_page(width=a4_width, height=a4_height)
+        cursor_y = margin
+        for image in images:
+            image = image.convert("RGB")
+            scale = min((a4_width - 2 * margin) / image.width, (a4_height - 2 * margin) / image.height, 72 / 150)
+            width, height = image.width * scale, image.height * scale
+            if cursor_y + height > a4_height - margin and cursor_y > margin:
+                page = document.new_page(width=a4_width, height=a4_height)
+                cursor_y = margin
+            buffer = io.BytesIO()
+            image.save(buffer, format="PNG")
+            page.insert_image(fitz.Rect(margin, cursor_y, margin + width, cursor_y + height), stream=buffer.getvalue())
+            cursor_y += height + gap
+        document.save(output_path, deflate=True)
 
 
-def normalize_print_background(image: Image.Image) -> Image.Image:
+def normalize_print_background(image: Image.Image, *, enhance: bool = False) -> Image.Image:
     image = image.convert("RGB")
+    if not enhance:
+        return image
     gray = ImageOps.grayscale(image)
     gray = flatten_page_shadow(gray)
     histogram = gray.histogram()
@@ -387,6 +406,230 @@ def normalize_print_background(image: Image.Image) -> Image.Image:
     normalized = gray.point(lut)
     normalized = normalized.point(lambda pixel: 255 if pixel >= 214 else pixel)
     return normalized.convert("RGB")
+
+
+def normalize_uploaded_page_photo(image: Image.Image) -> Image.Image:
+    if min(image.size) < 360:
+        return image
+
+    rectified = rectify_page_photo(image)
+    if rectified is not None:
+        return rectified
+
+    angle = estimate_page_rotation_angle(image)
+    if 0.35 <= abs(angle) <= 12:
+        rotated = image.rotate(angle, Image.Resampling.BICUBIC, expand=True, fillcolor="white")
+        detection_image = image.rotate(angle, Image.Resampling.BICUBIC, expand=True, fillcolor=(0, 0, 0))
+    else:
+        rotated = image
+        detection_image = image
+
+    bbox = detect_page_crop_bbox(detection_image)
+    if not bbox or not is_reasonable_page_crop(bbox, detection_image.width, detection_image.height):
+        return rotated
+    return rotated.crop(tuple(bbox))
+
+
+def estimate_page_rotation_angle(image: Image.Image) -> float:
+    detection = page_detection_thumbnail(image)
+    mask, width, height = paper_mask_for_detection(detection)
+    points = page_top_edge_points(mask, width, height)
+    if len(points) < 24:
+        return 0.0
+
+    x_values = [point[0] for point in points]
+    if max(x_values) - min(x_values) < width * 0.35:
+        return 0.0
+
+    slope, intercept, residual = robust_line_fit(points)
+    if abs(slope) < 0.006 or residual > min(width, height) * 0.045:
+        return 0.0
+
+    angle = math.degrees(math.atan(slope))
+    if abs(angle) > 12:
+        return 0.0
+    return angle
+
+
+def detect_page_crop_bbox(image: Image.Image) -> list[int] | None:
+    detection = page_detection_thumbnail(image)
+    mask, width, height = paper_mask_for_detection(detection)
+
+    min_row_hits = max(12, int(width * 0.12))
+    row_counts = [sum(mask[y * width : (y + 1) * width]) for y in range(height)]
+    row_run = largest_index_run([index for index, hits in enumerate(row_counts) if hits >= min_row_hits], row_counts)
+    if not row_run:
+        return None
+    y1, y2 = row_run[0], row_run[-1] + 1
+
+    min_col_hits = max(12, int((y2 - y1) * 0.12))
+    col_counts: list[int] = []
+    for x in range(width):
+        hits = 0
+        for y in range(y1, y2):
+            hits += mask[y * width + x]
+        col_counts.append(hits)
+    col_run = largest_index_run([index for index, hits in enumerate(col_counts) if hits >= min_col_hits], col_counts)
+    if not col_run:
+        return None
+    x1, x2 = col_run[0], col_run[-1] + 1
+
+    scale_x = image.width / detection.width
+    scale_y = image.height / detection.height
+    padding = max(2, int(min(image.size) * 0.006))
+    return [
+        max(0, int(x1 * scale_x) - padding),
+        max(0, int(y1 * scale_y) - padding),
+        min(image.width, int(x2 * scale_x) + padding),
+        min(image.height, int(y2 * scale_y) + padding),
+    ]
+
+
+def page_detection_thumbnail(image: Image.Image, max_edge: int = 900) -> Image.Image:
+    detection = image.convert("RGB")
+    detection.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
+    return detection
+
+
+def paper_mask_for_detection(image: Image.Image) -> tuple[bytearray, int, int]:
+    image = image.convert("RGB")
+    gray = ImageOps.grayscale(image)
+    saturation = image.convert("HSV").split()[1]
+    threshold = otsu_threshold(gray.histogram())
+    base_threshold = max(105, min(185, threshold + 8))
+    high_threshold = max(172, base_threshold + 28)
+
+    gray_data = gray.tobytes()
+    saturation_data = saturation.tobytes()
+    mask = bytearray(len(gray_data))
+    for index, gray_value in enumerate(gray_data):
+        saturation_value = saturation_data[index]
+        if gray_value >= high_threshold or (gray_value >= base_threshold and saturation_value <= 95):
+            mask[index] = 1
+    return mask, image.width, image.height
+
+
+def page_top_edge_points(mask: bytearray, width: int, height: int) -> list[tuple[int, int]]:
+    points: list[tuple[int, int]] = []
+    step = max(1, width // 260)
+    run_height = max(4, height // 160)
+    half_width = max(1, width // 320)
+
+    for x in range(0, width, step):
+        found_y: int | None = None
+        for y in range(0, max(1, height - run_height)):
+            hits = 0
+            total = 0
+            for yy in range(y, y + run_height):
+                row = yy * width
+                for xx in range(max(0, x - half_width), min(width, x + half_width + 1)):
+                    total += 1
+                    hits += mask[row + xx]
+            if hits >= max(3, int(total * 0.55)):
+                found_y = y
+                break
+        if found_y is not None:
+            points.append((x, found_y))
+
+    if len(points) < 24:
+        return points
+
+    y_values = sorted(point[1] for point in points)
+    low = y_values[int(len(y_values) * 0.05)]
+    high = y_values[int(len(y_values) * 0.95)]
+    return [(x, y) for x, y in points if low - 10 <= y <= high + 10]
+
+
+def robust_line_fit(points: list[tuple[int, int]]) -> tuple[float, float, float]:
+    active = points
+    for _ in range(2):
+        slope, intercept = line_fit(active)
+        residuals = [abs(y - (slope * x + intercept)) for x, y in active]
+        if not residuals:
+            return 0.0, 0.0, 0.0
+        median_residual = statistics.median(residuals)
+        cutoff = max(8.0, median_residual * 2.5)
+        filtered = [point for point, residual in zip(active, residuals) if residual <= cutoff]
+        if len(filtered) < max(24, len(active) // 2):
+            break
+        active = filtered
+
+    slope, intercept = line_fit(active)
+    residuals = [abs(y - (slope * x + intercept)) for x, y in active]
+    return slope, intercept, statistics.median(residuals) if residuals else 0.0
+
+
+def line_fit(points: list[tuple[int, int]]) -> tuple[float, float]:
+    count = len(points)
+    if count == 0:
+        return 0.0, 0.0
+    mean_x = sum(x for x, _ in points) / count
+    mean_y = sum(y for _, y in points) / count
+    denominator = sum((x - mean_x) ** 2 for x, _ in points)
+    if denominator <= 0:
+        return 0.0, mean_y
+    slope = sum((x - mean_x) * (y - mean_y) for x, y in points) / denominator
+    return slope, mean_y - slope * mean_x
+
+
+def largest_index_run(indices: list[int], weights: list[int]) -> list[int]:
+    if not indices:
+        return []
+
+    runs: list[list[int]] = []
+    current = [indices[0]]
+    for index in indices[1:]:
+        if index == current[-1] + 1:
+            current.append(index)
+        else:
+            runs.append(current)
+            current = [index]
+    runs.append(current)
+
+    return max(runs, key=lambda run: (sum(weights[index] for index in run), len(run)))
+
+
+def is_reasonable_page_crop(bbox: list[int], width: int, height: int) -> bool:
+    x1, y1, x2, y2 = bbox
+    crop_width = x2 - x1
+    crop_height = y2 - y1
+    if crop_width <= 0 or crop_height <= 0:
+        return False
+    if crop_width < width * 0.45 or crop_height < height * 0.45:
+        return False
+
+    area_ratio = (crop_width * crop_height) / max(1, width * height)
+    return 0.30 <= area_ratio <= 1.0
+
+
+def otsu_threshold(histogram: list[int]) -> int:
+    total = sum(histogram)
+    if total <= 0:
+        return 160
+
+    sum_total = sum(value * count for value, count in enumerate(histogram))
+    sum_background = 0.0
+    weight_background = 0
+    best_threshold = 160
+    best_variance = -1.0
+
+    for value, count in enumerate(histogram):
+        weight_background += count
+        if weight_background <= 0:
+            continue
+        weight_foreground = total - weight_background
+        if weight_foreground <= 0:
+            break
+
+        sum_background += value * count
+        mean_background = sum_background / weight_background
+        mean_foreground = (sum_total - sum_background) / weight_foreground
+        variance = weight_background * weight_foreground * (mean_background - mean_foreground) ** 2
+        if variance > best_variance:
+            best_variance = variance
+            best_threshold = value
+
+    return best_threshold
 
 
 def flatten_page_shadow(gray: Image.Image) -> Image.Image:

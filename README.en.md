@@ -25,6 +25,8 @@ https://github.com/linzi007/paper-cleaner
 - Uses Tencent Cloud `QuestionSplitOCR` for question region detection.
 - Supports PDF and common image uploads.
 - Supports uploading multiple images as multiple pages in one job.
+- Extracts a clear paper outline and corrects perspective before OCR, falling back to lightweight cropping and deskewing when the outline is uncertain.
+- Compare the cleaned page with its input. PDF export preserves source image pixels by default, without forced whitening or a 150-DPI raster sheet.
 - Supports full-paper preview, print, and download.
 - Supports selecting specific questions for retry or mistake review sheets.
 - Supports manual adjustment of OCR-detected question boxes.
@@ -92,6 +94,7 @@ TENCENTCLOUD_SECRET_ID=your-secret-id
 TENCENTCLOUD_SECRET_KEY=your-secret-key
 TENCENTCLOUD_REGION=ap-guangzhou
 PAPER_CLEANER_TENCENT_USE_NEW_MODEL=true
+PAPER_CLEANER_AUTO_CROP_IMAGES=true
 PAPER_CLEANER_MAX_PAGES=20
 PAPER_CLEANER_DEFAULT_ADMIN_PHONE=13800000000
 ```
@@ -99,6 +102,8 @@ PAPER_CLEANER_DEFAULT_ADMIN_PHONE=13800000000
 Notes:
 
 - Do not commit `TENCENTCLOUD_SECRET_ID` or `TENCENTCLOUD_SECRET_KEY`.
+- `PAPER_CLEANER_AUTO_CROP_IMAGES` is enabled by default; set it to `false` if a photo is cropped incorrectly.
+- `PAPER_CLEANER_ENHANCE_PRINT_BACKGROUND` defaults to `false` to preserve faint lines; set it to `true` to enable the previous print-background enhancement.
 - `PAPER_CLEANER_DEFAULT_ADMIN_PHONE` is only used on first startup when `data/users.json` does not exist.
 - `PAPER_CLEANER_MAX_PAGES` limits the maximum pages per job.
 
